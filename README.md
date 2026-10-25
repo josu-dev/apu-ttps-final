@@ -67,7 +67,7 @@ uv run 04_playing_boggle.py
 | **1. Prefijos y Consistencia** | `01_phone_list.py` | UVa 11362 | $O(N^2 \cdot L)$ (Fuerza bruta) | **$O(\sum \|S_i\|)$** | Detección *online* de prefijos durante la inserción en una sola pasada. |
 | **2. Bitwise Trie (XOR)** | `02_max_xor_subarray.py` | CSES 1655 | $O(N^2)$ (Pares de prefijos) | **$O(N \cdot 30)$** | Extensión del Trie a cadenas de bits y decisiones Greedy bit a bit. |
 | **3. Trie + DP** | `03_word_combinations.py` | CSES 1731 | $O(N \cdot K \cdot L)$ | **$O(N \cdot \text{prof.})$** | Poda inmediata de transiciones de DP al no hallar prefijos válidos. |
-| **4. Poda en Backtracking** | `04_playing_boggle.py` | UVa 11283 | $O(M \cdot 16 \cdot 8^L)$ | **$O(16 \cdot 8^{\text{podado}})$** | Descarte instantáneo de ramas infructuosas en búsqueda 2D. |
+| **4. Poda en Backtracking** | `04_playing_boggle.py` | UVa 11283 | $O(M \cdot 16 \cdot 8^L)$ | **$O(16 \cdot 8^{\text{podado}})$** | Descarte instantáneo de ramas infructuosas en búsqueda 2D y poda dinámica de hojas del Trie. |
 
 ---
 

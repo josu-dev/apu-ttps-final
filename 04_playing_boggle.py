@@ -44,6 +44,7 @@ Complejidad:
 """
 
 import sys
+from collections import Counter
 
 # Puntuación oficial de Boggle según longitud
 SCORES = {
@@ -62,6 +63,17 @@ DIRECTIONS = [
     (0, -1),           (0, 1),
     (1, -1),  (1, 0),  (1, 1)
 ]
+
+# Precomputar vecinos adyacentes válidos para cada una de las 16 celdas
+NEIGHBORS = {
+    (r, c): [
+        (r + dr, c + dc)
+        for dr, dc in DIRECTIONS
+        if 0 <= r + dr < 4 and 0 <= c + dc < 4
+    ]
+    for r in range(4)
+    for c in range(4)
+}
 
 
 class BoggleTrieNode:
@@ -86,7 +98,7 @@ class BoggleTrie:
         curr.word_index = index
 
 
-def solve_boggle_board(grid: list[str], words: list[str]) -> tuple[int, set[int]]:
+def solve_boggle_board(grid_rows: list, words: list) -> tuple:
     """
     Resuelve el juego de Boggle para una grilla de 4x4 y una lista de palabras.
 
@@ -94,19 +106,32 @@ def solve_boggle_board(grid: list[str], words: list[str]) -> tuple[int, set[int]
         - total_score: puntuación acumulada de las palabras válidas encontradas.
         - found_indices: conjunto con los índices de las palabras halladas.
     """
-    # 1. Insertar todas las palabras en el Trie
+    # 1. Poda previa por conteo de letras:
+    # Si una palabra requiere más instancias de un carácter que las que hay
+    # en el tablero (máx 16 letras), es físicamente imposible formarla.
+    board_chars = "".join(grid_rows)
+    board_counts = Counter(board_chars)
+
     trie = BoggleTrie()
+    candidate_count = 0
     for idx, w in enumerate(words):
+        w_counts = Counter(w)
+        if any(w_counts[c] > board_counts.get(c, 0) for c in w_counts):
+            continue
         trie.insert(w, idx)
+        candidate_count += 1
 
     found_word_indices = set()
-    rows, cols = 4, 4
-    visited = [[False] * cols for _ in range(rows)]
+    if candidate_count == 0:
+        return 0, found_word_indices
+
+    # Convertir filas a listas de caracteres para marcado in-place O(1)
+    grid = [list(row) for row in grid_rows]
 
     def dfs(r: int, c: int, trie_node: BoggleTrieNode):
         ch = grid[r][c]
         if ch not in trie_node.children:
-            # PODA: Ninguna palabra del diccionario continúa con este camino
+            # PODA 1 (Prefijos): Ninguna palabra en el diccionario continúa con esta letra
             return
 
         next_node = trie_node.children[ch]
@@ -114,21 +139,27 @@ def solve_boggle_board(grid: list[str], words: list[str]) -> tuple[int, set[int]
         # Si este nodo completa una palabra del diccionario
         if next_node.word_index != -1:
             found_word_indices.add(next_node.word_index)
-            # Nota: No retornamos aquí porque la palabra actual podría ser
-            # prefijo de una palabra aún más larga (ej. "CAT" y "CATER").
+            next_node.word_index = -1  # PODA 2: Evitar buscar la misma palabra nuevamente
 
-        visited[r][c] = True
+        grid[r][c] = '#'  # Marcado in-place sin necesidad de matriz visited auxiliar
 
-        for dr, dc in DIRECTIONS:
-            nr, nc = r + dr, c + dc
-            if 0 <= nr < rows and 0 <= nc < cols and not visited[nr][nc]:
+        for nr, nc in NEIGHBORS[(r, c)]:
+            if grid[nr][nc] != '#':
                 dfs(nr, nc, next_node)
 
-        visited[r][c] = False  # Backtrack
+        grid[r][c] = ch  # Backtrack
+
+        # PODA 3 (Poda Dinámica de Hojas): Si la rama del Trie quedó sin palabras
+        # pendientes y sin hijos, la eliminamos del padre para que ninguna futura
+        # exploración vuelva a entrar en este camino.
+        if not next_node.children and next_node.word_index == -1:
+            del trie_node.children[ch]
 
     # Iniciar DFS desde cada una de las 16 posiciones del tablero
-    for r in range(rows):
-        for c in range(cols):
+    for r in range(4):
+        for c in range(4):
+            if not trie.root.children:
+                break  # Si el Trie se vació (todas las palabras encontradas), terminamos temprano
             dfs(r, c, trie.root)
 
     # Calcular puntaje total
@@ -193,7 +224,33 @@ def run_tests():
     assert "CATO" in found_words2
     assert "DOG" not in found_words2
 
-    print("Todas las pruebas pasaron exitosamente.\n")
+    # Caso 3: Muestra oficial de UVa 11283 (Sample 1)
+    grid3 = [
+        "TNXO",
+        "AAEI",
+        "IOSR",
+        "BFRH"
+    ]
+    words3 = ["TAXES", "RISE", "ANNEX", "BOAT", "OATS", "FROSH", "HAT", "TRASH"]
+    score3, found3 = solve_boggle_board(grid3, words3)
+    found_words3 = [words3[i] for i in found3]
+    print(f"\nCaso 3 (Sample 1 Oficial UVa 11283): {found_words3}")
+    print(f"Puntaje obtenido: {score3} -> Esperado: 6")
+    assert score3 == 6
+
+    # Caso 4: Muestra oficial de UVa 11283 (Sample 2)
+    grid4 = [
+        "FNEI",
+        "OBCN",
+        "EERI",
+        "VSIR"
+    ]
+    words4 = ["BEER"]
+    score4, found4 = solve_boggle_board(grid4, words4)
+    print(f"\nCaso 4 (Sample 2 Oficial UVa 11283): Puntaje {score4} -> Esperado: 1")
+    assert score4 == 1
+
+    print("\nTodas las pruebas pasaron exitosamente.\n")
 
 
 def main():
@@ -214,7 +271,7 @@ def main():
         m = int(next(it))
         words = [next(it) for _ in range(m)]
         score, _ = solve_boggle_board(grid, words)
-        print(f"Score for Boggle game #{game_idx}: {score}")
+        print("Score for Boggle game #{}: {}".format(game_idx, score))
 
 
 if __name__ == "__main__":
